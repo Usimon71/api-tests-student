@@ -6,13 +6,19 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"sync"
+	"time"
 
 	"github.com/steinfletcher/apitest"
 )
 
 const (
+	requestInterval  = 200 * time.Millisecond
 	defaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
 )
+
+var requestMu sync.Mutex
+var lastRequest time.Time
 
 type ApiTest struct {
 	token     string
@@ -44,6 +50,7 @@ func (at *ApiTest) Create() *apitest.APITest {
 	}
 	return apitestNew.
 		Intercept(func(request *http.Request) {
+			waitForRequest()
 			request.Header.Set("User-Agent", at.userAgent)
 
 			if err := mergeServiceUrls(at.host, request.URL); err != nil {
@@ -73,4 +80,12 @@ func mergeServiceUrls(host string, r *url.URL) error {
 	r.Scheme = urlParsed.Scheme
 	r.Host = urlParsed.Host
 	return nil
+}
+
+// waitForRequest limits the request rate to avoid server rejections
+func waitForRequest() {
+	requestMu.Lock()
+	defer requestMu.Unlock()
+	time.Sleep(time.Until(lastRequest.Add(requestInterval)))
+	lastRequest = time.Now()
 }

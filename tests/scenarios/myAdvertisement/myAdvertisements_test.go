@@ -12,6 +12,7 @@ import (
 	"api-tests-template/internal/managers/auth"
 	"api-tests-template/internal/managers/auth/models"
 	"api-tests-template/internal/managers/myAdvertisements"
+	"api-tests-template/tests/fixtures"
 
 	base "api-tests-template/tests"
 )
@@ -19,6 +20,7 @@ import (
 type TestSuite struct {
 	suite.Suite
 	loginData models.LoginOkResponse
+	title     string
 }
 
 func TestSuiteRun(t *testing.T) {
@@ -30,6 +32,9 @@ func (s *TestSuite) SetupSuite() {
 
 	base.Precondition("Авторизация пользователя с кредами из переменных окружения и получение его параметров")
 	s.loginData = auth.Login(s.T(), os.Getenv("TEST_LOGIN"), os.Getenv("TEST_PASSWORD"))
+	fields := fixtures.Fields()
+	s.title = fields["title"]
+	fixtures.Advertisement(s.T(), s.loginData.Token, fields)
 }
 
 func (s *TestSuite) TearDownSuite() {
@@ -40,7 +45,7 @@ func (s *TestSuite) TearDownSuite() {
 func (s *TestSuite) TestGetMyAdvertisementsPositive() {
 	var advertisementsBody string
 	s.Run("Получаем список собственных объявлений", func() {
-		advertisementsBody = myAdvertisements.GetMyAdvertisements(s.T(), s.loginData.Token, http.StatusOK, 50)
+		advertisementsBody = myAdvertisements.GetMyAdvertisements(s.T(), s.loginData.Token, http.StatusOK, 50, s.title)
 	})
 
 	var items gjson.Result

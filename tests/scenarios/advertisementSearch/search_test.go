@@ -14,9 +14,10 @@ import (
 	"api-tests-template/internal/managers/auth/models"
 	"api-tests-template/internal/utils"
 	base "api-tests-template/tests"
+	"api-tests-template/tests/fixtures"
 )
 
-const (
+var (
 	existingAdTitle = "Клюшка хоккейная Bauer Vapor X3"
 	searchBeginning = "Клюшка хоккейная"
 	searchMiddle    = "хоккейная Bauer"
@@ -41,6 +42,10 @@ func (s *TestSuite) SetupSuite() {
 	require.NotEmpty(s.T(), searchEnd, "set searchEnd")
 
 	s.loginData = auth.Login(s.T(), os.Getenv("TEST_LOGIN"), os.Getenv("TEST_PASSWORD"))
+	fields := fixtures.Fields()
+	existingAdTitle = "Клюшка хоккейная Bauer Vapor X3 " + fields["title"][len(fields["title"])-10:]
+	fields["title"] = existingAdTitle
+	fixtures.Advertisement(s.T(), s.loginData.Token, fields)
 }
 
 func (s *TestSuite) TearDownSuite() {
