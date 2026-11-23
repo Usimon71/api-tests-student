@@ -40,6 +40,15 @@ func Login(t *testing.T, second bool) models.LoginOkResponse {
 	return auth.Login(t, os.Getenv(prefix+"LOGIN"), os.Getenv(prefix+"PASSWORD"))
 }
 
+// LoginOwnerAndBuyer authenticates two distinct accounts for favorites tests
+func LoginOwnerAndBuyer(t *testing.T) (models.LoginOkResponse, models.LoginOkResponse) {
+	t.Helper()
+	owner := Login(t, false)
+	buyer := Login(t, true)
+	require.NotEqual(t, owner.User.Id, buyer.User.Id, "Для избранного нужны разные аккаунты")
+	return owner, buyer
+}
+
 // Fields returns all advertisement fields with a unique title
 func Fields() map[string]string {
 	return map[string]string{

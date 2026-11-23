@@ -9,12 +9,11 @@ import (
 	"api-tests-template/tests/fixtures"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestFavoritesCycle(t *testing.T) {
-	owner := fixtures.Login(t, false)
-	user := fixtures.Login(t, true)
-	require.NotEqual(t, owner.User.Id, user.User.Id, "Для избранного нужны разные аккаунты")
+	owner, buyer := fixtures.LoginOwnerAndBuyer(t)
 	fields := fixtures.Fields()
 	ad := ads.Create(t, owner.Token, fields, fixtures.Photos(), http.StatusCreated)
 	id := ad.Get("id").String()
@@ -26,21 +25,31 @@ func TestFavoritesCycle(t *testing.T) {
 		}
 	})
 	t.Log("Шаг: добавление чужого объявления в избранное")
-	added := fav.Add(t, user.Token, id, http.StatusCreated)
+	added := fav.Add(t, buyer.Token, id, http.StatusCreated)
 	require.Equal(t, id, added.Get("advertisement.id").String(), "Добавлено другое объявление")
-	list := fav.List(t, user.Token, fields["title"], http.StatusOK)
+	list := fav.List(t, buyer.Token, fields["title"], http.StatusOK)
 	require.EqualValues(t, 1, list.Get("total").Int(), "Объявление не появилось в избранном")
 	require.Equal(t, id, list.Get("items.0.advertisement.id").String(), "В избранном другое объявление")
 	t.Log("Шаг: удаление из избранного")
-	fav.Delete(t, user.Token, id, http.StatusNoContent)
-	list = fav.List(t, user.Token, fields["title"], http.StatusOK)
-	require.Empty(t, list.Get("items").Array(), "Удалённое объявление осталось в избранном")
+	fav.Delete(t, buyer.Token, id, http.StatusNoContent)
+	list = fav.List(t, buyer.Token, fields["title"], http.StatusOK)
+	requireEmptyFavorites(t, list)
 	t.Log("Шаг: повторное добавление и удаление самого объявления")
-	fav.Add(t, user.Token, id, http.StatusCreated)
+	fav.Add(t, buyer.Token, id, http.StatusCreated)
 	ads.Delete(t, owner.Token, id, http.StatusNoContent)
 	deleted = true
-	list = fav.List(t, user.Token, fields["title"], http.StatusOK)
-	require.Empty(t, list.Get("items").Array(), "Удалённое объявление осталось в избранном")
-	require.Zero(t, list.Get("total").Int(), "Неверное число избранных после удаления объявления")
+	list = fav.List(t, buyer.Token, fields["title"], http.StatusOK)
+	requireEmptyFavorites(t, list)
 	t.Log("Результат: полный цикл избранного проверен")
+}
+
+// requireEmptyFavorites checks that the response contains an empty list and a zero total
+func requireEmptyFavorites(t *testing.T, list gjson.Result) {
+	t.Helper()
+	items := list.Get("items")
+	total := list.Get("total")
+	require.True(t, items.IsArray(), "Поле items должно быть массивом: %s", list.Raw)
+	require.Equal(t, gjson.Number, total.Type, "Поле total должно быть числом: %s", list.Raw)
+	require.Empty(t, items.Array(), "Удалённое объявление осталось в избранном")
+	require.Zero(t, total.Float(), "Ожидали пустой список избранного, ответ: %s", list.Raw)
 }
